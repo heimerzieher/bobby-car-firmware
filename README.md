@@ -1,6 +1,6 @@
 Bobby Car Firmware FOC 
 ==== 
-Firmware for all wheel drive bobby car with four hoverboard motors and two hoverboard motorcontrollers. The hoverboard mainboards are controlled via ADC (XBox 360 triggers with potis) and (!) UART (microcontroller, currently arduino uno for testing). 
+Firmware for all wheel drive bobby car with four hoverboard motors and two hoverboard motorcontrollers. The hoverboard mainboards are controlled via ADC (XBox 360 triggers with potis) and UART through an esp32 microcontroller. The esp32 is connected via SPI to an 3.5 inch touch screen (ILI9488) with an XPT2046 touch controller. For the wiring see the platformio.ini in the microcontroller folder...
 
 
 todo...

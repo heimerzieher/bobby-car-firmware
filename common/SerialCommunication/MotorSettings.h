@@ -1,5 +1,5 @@
-#ifndef SETTINGS_H
-#define SETTINGS_H
+#ifndef MOTORSETTINGS_H
+#define MOTORSETTINGS_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,6 +18,16 @@ typedef enum
     SpeedMode = 2,
     TorqueMode = 3
 } ControlMode;
+
+typedef struct
+{
+    int16_t nRpm;
+    int16_t dcCurrent;
+    uint16_t errorCode;
+    uint16_t hallA; //bool
+    uint16_t hallB; //bool
+    uint16_t hallC; //bool
+} MotorStatus;
 
 typedef struct
 {
@@ -40,30 +50,7 @@ typedef struct
 } MotorSettings;
 
 //TODO make a const variable
-MotorSettings defaultMotorSettings(void)
-{
-    MotorSettings settings;
-
-
-    settings.enable = (uint16_t)true; // Enable/Disable Motor
-
-    settings.diagnosticsEnable = (uint16_t)true; // [-] Motor Diagnostics enable flag: 0 = Disabled, 1 = Enabled (default)
-
-    settings.controlType = (uint16_t)FOC;
-    settings.controlMode = (uint16_t)TorqueMode;
-
-    settings.iMotorMax  = 12;                    // [A] Maximum motor current limit
-    settings.iDcCurrentMax = 14;                 // [A] Maximum DC Link current limit (This is the final current protection. Above this value, current chopping is applied. To avoid this make sure that I_DC_MAX = I_MOT_MAX + 2A)
-    settings.nMotorMax = 1000;                   // [rpm] Maximum motor speed limit
-
-    settings.fieldWeakeningEnable = (uint16_t)true;           // [-] Field Weakening / Phase Advance enable flag: 0 = Disabled, 1 = Enabled
-    settings.fieldWeakeningMax = 5;              // [A] Maximum Field Weakening D axis current (only for FOC). Higher current results in higher maximum speed.
-    settings.fieldWeakeningPhaseAdvanceMax = 25; // [deg] Maximum Phase Advance angle (only for SIN). Higher angle results in higher maximum speed.
-    settings.fieldWeakeningHigh = 1500;          // [-] Input target High threshold for reaching maximum Field Weakening / Phase Advance. Do NOT set this higher than 1500.
-    settings.fieldWeakeningLow = 1000;           // [-] Input target Low threshold for starting Field Weakening / Phase Advance. Do NOT set this higher than 1000.
-
-    return settings;
-};
+MotorSettings defaultMotorSettings(void);
 
 /*
 typedef struct MotorSettings
@@ -86,4 +73,4 @@ typedef struct MotorSettings
     int16_t fieldWeakeningLow = 1000;           // [-] Input target Low threshold for starting Field Weakening / Phase Advance. Do NOT set this higher than 1000.
 };*/
 
-#endif // SETTINGS_H
+#endif // MOTORSETTINGS_H

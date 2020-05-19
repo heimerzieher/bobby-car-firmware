@@ -29,7 +29,7 @@
 #include "BLDC_controller.h"      /* Model's header file */
 #include "rtwtypes.h"
 
-#include "../../common/Inc/SerialCommunication.h"
+#include "SerialCommunication.h"
 
 /*** Forward declarations ***/
 
@@ -108,6 +108,9 @@ uint8_t buzzerPattern = 0;           // global variable for the buzzer pattern. 
 static uint32_t buzzerTimer = 0;
 
 
+/*** temnperature sensor ***/
+int16_t board_temp_deg_c;
+
 
 static const uint16_t pwm_res  = 64000000 / 2 / PWM_FREQ; // = 2000
 static const int16_t pwm_margin = 100;
@@ -127,6 +130,7 @@ SerialFeedback feedback;
 SerialCommand command;
 
 void receiveCommand(void);
+void transmitFeedback(void);
 
 void BLDC_Init(void) {
   /* Set default settings and default input */
@@ -292,7 +296,6 @@ int main(void)
 
     int32_t board_temp_adcFixdt = adc_buffer.temp << 20;  // Fixed-point filter output initialized with current ADC converted to fixed-point
     int16_t board_temp_adcFilt  = adc_buffer.temp;
-    int16_t board_temp_deg_c;
 
     HAL_UART_Receive_DMA(&huart3, (uint8_t *)&command, sizeof(command));
 
@@ -386,37 +389,8 @@ int main(void)
         board_temp_deg_c    = (TEMP_CAL_HIGH_DEG_C - TEMP_CAL_LOW_DEG_C) * (board_temp_adcFilt - TEMP_CAL_LOW_ADC) / (TEMP_CAL_HIGH_ADC - TEMP_CAL_LOW_ADC) + TEMP_CAL_LOW_DEG_C;
 
         // ####### FEEDBACK SERIAL OUT #######
-        if (main_loop_counter % 2 == 0)
-        {
-            // Send data periodically every 10 ms
-            feedback.start	        = (uint16_t)SERIAL_START_FRAME;
-            feedback.cmd1           = (int16_t)leftPoti;
-            feedback.cmd2           = (int16_t)rightPoti;
-            feedback.adc1           = (int16_t)adc_buffer.l_tx2;
-            feedback.adc2           = (int16_t)adc_buffer.l_rx2;
-            feedback.pwm1           = (int16_t)leftMotor.input.pwm;
-            feedback.pwm2           = (int16_t)rightMotor.input.pwm;
-            feedback.speedR_meas	  = (int16_t)rightMotor.rtY.n_mot;
-            feedback.speedL_meas	  = (int16_t)leftMotor.rtY.n_mot;
-            feedback.batVoltage	    = (int16_t)(batVoltage * BAT_CALIB_REAL_VOLTAGE / BAT_CALIB_ADC);
-            feedback.boardTemp	    = (int16_t)board_temp_deg_c;
-
-            feedback.leftMotorSettings = leftMotor.settings;
-            feedback.rightMotorSettings = rightMotor.settings;
-
-            feedback.leftMotorInput = leftMotor.input;
-            feedback.rightMotorInput = rightMotor.input;
-
-            if(DMA1_Channel2->CNDTR == 0)
-            {
-                feedback.cmdLed         = (uint16_t)0;
-                feedback.checksum       = (uint16_t)calculateChecksumFeedback(feedback);
-                DMA1_Channel2->CCR     &= ~DMA_CCR_EN;
-                DMA1_Channel2->CNDTR    = sizeof(feedback);
-                DMA1_Channel2->CMAR     = (uint32_t)&feedback;
-                DMA1_Channel2->CCR     |= DMA_CCR_EN;
-            }
-        }
+        if(main_loop_counter % 25 == 0)
+            transmitFeedback();
 
         // ####### POWEROFF BY POWER-BUTTON #######
         if (HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN))
@@ -1230,6 +1204,57 @@ void MX_ADC2_Init(void) {
 
   hadc2.Instance->CR2 |= ADC_CR2_DMA;
   __HAL_ADC_ENABLE(&hadc2);
+}
+
+void transmitFeedback(void)
+{
+    if (main_loop_counter % 25 == 0)
+    {
+        // Send data periodically every 10 ms
+        feedback.start	        = (uint16_t)SERIAL_START_FRAME;
+        feedback.cmd1           = (int16_t)leftMotor.input.pwm;
+        feedback.cmd2           = (int16_t)rightMotor.input.pwm;
+        feedback.adc1           = (int16_t)adc_buffer.l_tx2;
+        feedback.adc2           = (int16_t)adc_buffer.l_rx2;
+        feedback.pwm1           = (int16_t)leftMotor.input.pwm;
+        feedback.pwm2           = (int16_t)rightMotor.input.pwm;
+        feedback.speedR_meas	  = (int16_t)rightMotor.rtY.n_mot;
+        feedback.speedL_meas	  = (int16_t)leftMotor.rtY.n_mot;
+        feedback.batVoltage	    = (int16_t)(batVoltage * BAT_CALIB_REAL_VOLTAGE / BAT_CALIB_ADC);
+        feedback.boardTemp	    = (int16_t)board_temp_deg_c;
+
+        feedback.leftMotorSettings = leftMotor.settings;
+        feedback.rightMotorSettings = rightMotor.settings;
+
+        feedback.leftMotorStatus.nRpm = leftMotor.rtY.n_mot;
+        feedback.leftMotorStatus.hallA = leftMotor.rtU.b_hallA;
+        feedback.leftMotorStatus.hallB = leftMotor.rtU.b_hallB;
+        feedback.leftMotorStatus.hallC = leftMotor.rtU.b_hallC;
+        feedback.leftMotorStatus.dcCurrent = leftMotor.rtU.i_DCLink;
+        feedback.leftMotorStatus.errorCode = leftMotor.errCode;
+
+        feedback.rightMotorStatus.nRpm = rightMotor.rtY.n_mot;
+        feedback.rightMotorStatus.hallA = rightMotor.rtU.b_hallA;
+        feedback.rightMotorStatus.hallB = rightMotor.rtU.b_hallB;
+        feedback.rightMotorStatus.hallC = rightMotor.rtU.b_hallC;
+        feedback.rightMotorStatus.dcCurrent = rightMotor.rtU.i_DCLink;
+        feedback.rightMotorStatus.errorCode = rightMotor.errCode;
+
+        feedback.leftMotorInput = leftMotor.input;
+        feedback.rightMotorInput = rightMotor.input;
+
+        feedback.test = sizeof(testStruct);
+
+        if(DMA1_Channel2->CNDTR == 0)
+        {
+            feedback.cmdLed         = (uint16_t)0;
+            feedback.checksum       = (uint16_t)calculateChecksumFeedback(feedback);
+            DMA1_Channel2->CCR     &= ~DMA_CCR_EN;
+            DMA1_Channel2->CNDTR    = sizeof(feedback);
+            DMA1_Channel2->CMAR     = (uint32_t)&feedback;
+            DMA1_Channel2->CCR     |= DMA_CCR_EN;
+        }
+    }
 }
 
 void receiveCommand(void)
